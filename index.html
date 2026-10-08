@@ -73,6 +73,7 @@ const CONFIG = {
   catMin: 2800, catMax: 3500, catLife: 1700,   // cat timing (ms)
   messageDuration: 1000,   // "lazy frrr" lifetime (ms)
   msgChance: 0.35,         // chance of a teasing banner per escape
+  phoneSpeed: 1.8,         // movement speed multiplier on phones/touch screens (1 = desktop speed)
   maxEscapes: 10,          // escapes before the ending
   enableEnding: true,
   maxParticles: 320
@@ -86,7 +87,7 @@ const world = $('world'), cv = $('c'), ctx = cv.getContext('2d');
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
-let W = 0, H = 0, DPR = 1, S = 100;
+let W = 0, H = 0, DPR = 1, S = 100, SPEED = 1;
 const bounds = { l: 0, r: 0, t: 0, b: 0 };
 const heart = { x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0, rot: 0, alert: 0, flapF: 5, phase: 0, mode: 'idle', fleeUntil: 0, nextWander: 0 };
 const pointer = { x: -999, y: -999, active: false };
@@ -102,6 +103,7 @@ function resize() {
   cv.width = W * DPR; cv.height = H * DPR;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   S = clamp(Math.min(W, H) * .24, 78, CONFIG.heartSize);
+  SPEED = (window.matchMedia('(pointer:coarse)').matches || Math.min(W, H) < 600) ? CONFIG.phoneSpeed : 1;
   const hudBottom = $('hud').getBoundingClientRect().bottom;
   bounds.l = S * 1.2; bounds.r = W - S * 1.2;
   bounds.t = hudBottom + S * .75; bounds.b = H - S * .8;
@@ -227,7 +229,7 @@ function wander(now) {
   const R = Math.min(W, H) * .35;
   heart.tx = clamp(heart.x + rand(-R, R), bounds.l, bounds.r);
   heart.ty = clamp(heart.y + rand(-R, R), bounds.t, bounds.b);
-  heart.nextWander = now + rand(2200, 4200);
+  heart.nextWander = now + rand(2200, 4200) / SPEED;
 }
 function escape(now) {
   if (state !== 'play') return;
@@ -247,7 +249,7 @@ function escape(now) {
   }
   if (!best) best = { x: rand(bounds.l, bounds.r), y: rand(bounds.t, bounds.b) };
   heart.tx = best.x; heart.ty = best.y; heart.mode = 'flee';
-  heart.fleeUntil = now + 850; heart.nextWander = now + 1800;
+  heart.fleeUntil = now + 850 / SPEED; heart.nextWander = now + 1800 / SPEED;
   burst(ox, oy, 28); shake = 7; lazyText(ox, oy); blip(700, 150, .28, 'sine', .08);
   escapes++; $('count').textContent = 'Escapes: ' + escapes;
   if (Math.random() < CONFIG.msgChance) showMsg(TEASES[Math.floor(Math.random() * TEASES.length)]);
@@ -261,11 +263,12 @@ function update(dt, t, now) {
   if (heart.mode === 'flee' && now > heart.fleeUntil) heart.mode = 'idle';
   if (state === 'play' && heart.mode === 'idle' && now > heart.nextWander) wander(now);
   const flee = heart.mode === 'flee', k = flee ? 12 : 1.5, c = flee ? 6.5 : 2.3;
-  heart.vx += ((heart.tx - heart.x) * k - heart.vx * c) * dt;
-  heart.vy += ((heart.ty - heart.y) * k - heart.vy * c) * dt;
-  const sp = Math.hypot(heart.vx, heart.vy), mx = flee ? 1800 : 260;
+  const mdt = dt * SPEED;                                   // faster on phones, same easing curve
+  heart.vx += ((heart.tx - heart.x) * k - heart.vx * c) * mdt;
+  heart.vy += ((heart.ty - heart.y) * k - heart.vy * c) * mdt;
+  const sp = Math.hypot(heart.vx, heart.vy), mx = (flee ? 1800 : 260) * SPEED;
   if (sp > mx) { heart.vx *= mx / sp; heart.vy *= mx / sp; }
-  heart.x += heart.vx * dt; heart.y += heart.vy * dt;
+  heart.x += heart.vx * mdt; heart.y += heart.vy * mdt;
   if (heart.x < bounds.l || heart.x > bounds.r) { heart.x = clamp(heart.x, bounds.l, bounds.r); heart.vx *= -.2; }
   if (heart.y < bounds.t || heart.y > bounds.b) { heart.y = clamp(heart.y, bounds.t, bounds.b); heart.vy *= -.2; }
   const lean = heart.alert * (heart.x > pointer.x ? 1 : -1) * .14;
