@@ -78,8 +78,8 @@ const CONFIG = {
   enableEnding: true,
   maxParticles: 320
 };
-const TEASES = ['Almost! 😏','Too slow!','Nice try 😂','You really thought you could catch me?','Nope ❤️','Try again!'];
-const CAT_LINES = ['hehe 😼','Too slow!','Nope 😹','lol 😂','Over here!'];
+const TEASES = ['Almost! 😏','Too slow hajur!','Nice try 😂','Hajur really thought Hajur could catch me?','No no no ❤️','Try again!'];
+const CAT_LINES = ['Hehe Hajur! 😼','Too slow!','Nope 😹','lol 😂','Hajur Yeta!'];
 
 /* ================= HELPERS / STATE ================= */
 const $ = id => document.getElementById(id);
@@ -301,13 +301,13 @@ const big = (text) => { const b = $('big'); b.textContent = text; b.classList.to
 function startEnding() {
   heart.tx = (bounds.l + bounds.r) / 2; heart.ty = (bounds.t + bounds.b) / 2; heart.mode = 'idle';
   world.classList.add('dim');
-  setTimeout(() => { big('Okay okay… you win 😭❤️'); blip(1200, 1800, .3, 'sine', .05); }, 1600);
-  setTimeout(() => big('But you still can\'t catch me.'), 4600);
+  setTimeout(() => { big('Ahhh… Hajur win 😭❤️'); blip(1200, 1800, .3, 'sine', .05); }, 1600);
+  setTimeout(() => big('But Hajur still can\'t catch me.'), 4600);
   setTimeout(() => {
     big(''); endingDone = true; state = 'play'; world.classList.remove('dim');
     escape(performance.now());                            // one final playful escape
   }, 7400);
-  setTimeout(() => big('Maybe S was never meant to be caught… ❤️'), 8600);
+  setTimeout(() => big('Maybe Hajur was never meant to be caught… ❤️ \n Hajur just always fly high...🪽  '), 8600);
   setTimeout(() => big(''), 15500);
 }
 
