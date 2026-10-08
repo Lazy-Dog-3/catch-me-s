@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Catch Me ❤️</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Great+Vibes&family=Quicksand:wght@600&display=swap">
+<style>
+:root{--ink:#fff0f6;--glow:#ff4d94}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#07040f;touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+body{font-family:'Quicksand',system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--ink)}
+#world{position:fixed;inset:0;overflow:hidden;background:
+ radial-gradient(ellipse at 50% 90%,rgba(255,80,150,.24),transparent 60%),
+ radial-gradient(ellipse at 18% 8%,rgba(140,80,255,.28),transparent 55%),
+ linear-gradient(#07040f,#1b0a35 60%,#33103f)}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hud{position:absolute;top:0;left:0;right:0;text-align:center;padding:calc(env(safe-area-inset-top,0px) + 14px) 12px 0;pointer-events:none}
+h1{font-family:'Cinzel',Georgia,serif;font-weight:700;font-size:clamp(28px,7.5vw,62px);letter-spacing:.12em;line-height:1.1;color:#ffdcec;text-shadow:0 0 12px #ff5c9a,0 0 34px #ff2e7e,0 0 70px #a23cff}
+.sub{font-family:'Great Vibes',cursive;font-size:clamp(22px,5vw,32px);color:#ffc2dd}
+#count{margin-top:4px;font-size:15px;letter-spacing:.08em;color:#ffd0e4;text-shadow:0 0 10px var(--glow)}
+#msg{height:26px;margin-top:4px;font-size:clamp(15px,3.8vw,19px);text-shadow:0 0 12px var(--glow);opacity:0;transition:opacity .25s}
+#msg.on{opacity:1}
+#snd{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);right:12px;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,170,210,.5);background:rgba(40,10,50,.55);color:#fff;font-size:18px;cursor:pointer;z-index:5}
+#dim{position:absolute;inset:0;background:#000;opacity:0;transition:opacity 1.6s;pointer-events:none}
+#world.dim #dim{opacity:.5}
+#big{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 9vh);padding:0 16px;text-align:center;font-family:'Great Vibes',cursive;font-size:clamp(30px,7.5vw,54px);color:#fff;text-shadow:0 0 14px #ff4d94,0 0 40px #ff2e7e;opacity:0;transition:opacity 1s;pointer-events:none}
+#big.on{opacity:1}
+.lazy{position:absolute;pointer-events:none;transform:translate(-50%,-50%)}
+.lazy span{display:block;white-space:nowrap;font-size:clamp(18px,4.8vw,26px);color:#fff;text-shadow:0 0 10px #ff4d94,0 0 22px #ff2e7e;animation:lazy 1s ease-out forwards}
+@keyframes lazy{0%{opacity:0;transform:scale(.7) translateY(0)}18%{opacity:1;transform:scale(1.05) translateY(-6px)}70%{opacity:1;transform:scale(1) translateY(-20px)}100%{opacity:0;transform:scale(1) translateY(-28px)}}
+.cat{position:absolute;width:var(--cs);height:var(--cs);pointer-events:none;animation:catIn .5s cubic-bezier(.34,1.56,.64,1) both}
+.cat.out{animation:catOut .35s ease-in forwards}
+@keyframes catIn{from{transform:translate(var(--dx),var(--dy)) scale(.6)}to{transform:none}}
+@keyframes catOut{to{opacity:0;transform:translate(calc(var(--dx)*.6),calc(var(--dy)*.6)) scale(.8)}}
+.cat svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 10px rgba(255,120,180,.5))}
+.cat.flip svg{transform:scaleX(-1)}
+.head{transform-origin:50px 70px;animation:tilt 1.1s ease-in-out infinite alternate}
+@keyframes tilt{from{transform:rotate(-8deg)}to{transform:rotate(8deg)}}
+.eye{transform-box:fill-box;transform-origin:center;animation:blink 1.6s infinite}
+@keyframes blink{0%,88%,100%{transform:scaleY(1)}93%{transform:scaleY(.1)}}
+.tail{transform-box:fill-box;transform-origin:0 100%;animation:wag .45s ease-in-out infinite alternate}
+@keyframes wag{from{transform:rotate(-14deg)}to{transform:rotate(18deg)}}
+.bub{position:absolute;left:50%;bottom:100%;translate:-50% 0;transform:scale(0);white-space:nowrap;background:#fff;color:#7a1346;font-size:14px;padding:6px 12px;border-radius:14px;box-shadow:0 0 16px rgba(255,120,180,.7);animation:pop .3s .25s cubic-bezier(.34,1.56,.64,1) forwards}
+.bub.below{bottom:auto;top:100%}
+@keyframes pop{to{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.head,.tail,.eye{animation:none}}
+</style>
+</head>
+<body>
+<div id="world">
+  <canvas id="c"></canvas>
+  <div id="dim"></div>
+  <div id="hud">
+    <h1>CATCH ME ❤️</h1>
+    <p class="sub">If you can… 😏</p>
+    <p id="count">Escapes: 0</p>
+    <p id="msg"></p>
+  </div>
+  <div id="big"></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= CONFIG — tweak freely ================= */
+const CONFIG = {
+  heartSize: 140,          // max heart width in px (shrinks on small screens)
+  escapeDistance: 150,     // cursor/finger distance that triggers an escape
+  alertFactor: 1.6,        // wings speed up inside escapeDistance * this
+  escapeCooldown: 650,     // ms between escapes
+  catMin: 2800, catMax: 3500, catLife: 1700,   // cat timing (ms)
+  messageDuration: 1000,   // "lazy frrr" lifetime (ms)
+  msgChance: 0.35,         // chance of a teasing banner per escape
+  maxEscapes: 10,          // escapes before the ending
+  enableEnding: true,
+  maxParticles: 320
+};
+const TEASES = ['Almost! 😏','Too slow!','Nice try 😂','You really thought you could catch me?','Nope ❤️','Try again!'];
+const CAT_LINES = ['hehe 😼','Too slow!','Nope 😹','lol 😂','Over here!'];
+
+/* ================= HELPERS / STATE ================= */
+const $ = id => document.getElementById(id);
+const world = $('world'), cv = $('c'), ctx = cv.getContext('2d');
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+let W = 0, H = 0, DPR = 1, S = 100;
+const bounds = { l: 0, r: 0, t: 0, b: 0 };
+const heart = { x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0, rot: 0, alert: 0, flapF: 5, phase: 0, mode: 'idle', fleeUntil: 0, nextWander: 0 };
+const pointer = { x: -999, y: -999, active: false };
+const par = { x: 0, y: 0 };
+let escapes = 0, state = 'play', lastEscape = -1e9, shake = 0, endingDone = false, bgT = 1;
+const parts = [];
+const stars = Array.from({ length: 110 }, () => ({ x: Math.random(), y: Math.random(), z: rand(.2, 1), p: Math.random() * 6.28 }));
+
+/* ================= RESPONSIVE ================= */
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  S = clamp(Math.min(W, H) * .24, 78, CONFIG.heartSize);
+  const hudBottom = $('hud').getBoundingClientRect().bottom;
+  bounds.l = S * 1.2; bounds.r = W - S * 1.2;
+  bounds.t = hudBottom + S * .75; bounds.b = H - S * .8;
+  if (bounds.r < bounds.l) bounds.l = bounds.r = W / 2;
+  if (bounds.b < bounds.t) bounds.t = bounds.b = (hudBottom + H) / 2;
+  heart.x = clamp(heart.x, bounds.l, bounds.r); heart.y = clamp(heart.y, bounds.t, bounds.b);
+  heart.tx = clamp(heart.tx, bounds.l, bounds.r); heart.ty = clamp(heart.ty, bounds.t, bounds.b);
+}
+
+/* ================= PARTICLES ================= */
+function spawn(x, y, o) {
+  if (parts.length >= CONFIG.maxParticles) parts.shift();
+  parts.push(Object.assign({ x, y, vx: 0, vy: 0, age: 0, life: 1, size: 2, heart: false, hue: 335, g: 0, drag: .15, a: 1 }, o));
+}
+function burst(x, y, n) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, 6.283), sp = rand(80, 300);
+    spawn(x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(.5, 1.1), size: rand(1.5, 4.5), heart: Math.random() < .3, hue: rand(310, 350), g: 40 });
+  }
+}
+function heartPath(s) {
+  ctx.beginPath();
+  ctx.moveTo(0, -.25 * s);
+  ctx.bezierCurveTo(0, -.55 * s, -.5 * s, -.55 * s, -.5 * s, -.2 * s);
+  ctx.bezierCurveTo(-.5 * s, .1 * s, -.15 * s, .25 * s, 0, .45 * s);
+  ctx.bezierCurveTo(.15 * s, .25 * s, .5 * s, .1 * s, .5 * s, -.2 * s);
+  ctx.bezierCurveTo(.5 * s, -.55 * s, 0, -.55 * s, 0, -.25 * s);
+  ctx.closePath();
+}
+function drawParts(dt) {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i]; p.age += dt;
+    if (p.age >= p.life) { parts.splice(i, 1); continue; }
+    const k = 1 - p.age / p.life, d = Math.pow(p.drag, dt);
+    p.vx *= d; p.vy = p.vy * d + p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    ctx.globalAlpha = p.a * k; ctx.fillStyle = `hsl(${p.hue},100%,72%)`;
+    if (p.heart) { ctx.save(); ctx.translate(p.x, p.y); heartPath(p.size * 2.2); ctx.fill(); ctx.restore(); }
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * k + .5, 0, 6.283); ctx.fill(); }
+  }
+  ctx.restore();
+}
+function drawStars(t) {
+  par.x = lerp(par.x, pointer.active ? pointer.x / W - .5 : 0, .04);
+  par.y = lerp(par.y, pointer.active ? pointer.y / H - .5 : 0, .04);
+  ctx.fillStyle = '#ffe9f5';
+  for (const s of stars) {
+    ctx.globalAlpha = .25 + .55 * (.5 + .5 * Math.sin(t * 1.4 + s.p)) * s.z;
+    ctx.fillRect(s.x * W - par.x * 36 * s.z, s.y * H - par.y * 24 * s.z, s.z * 1.9, s.z * 1.9);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ================= HEART + WINGS ================= */
+function feather(L, w, layer) {
+  const g = ctx.createLinearGradient(0, 0, L, 0);
+  g.addColorStop(0, 'rgba(255,255,255,.95)');
+  g.addColorStop(.55, layer === 2 ? 'rgba(255,214,236,.85)' : 'rgba(255,190,225,.7)');
+  g.addColorStop(1, 'rgba(176,140,255,.42)');
+  ctx.beginPath(); ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(L * .25, -w * 1.1, L * .78, -w, L, 0);
+  ctx.bezierCurveTo(L * .8, w * .75, L * .25, w * .9, 0, 0);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = .8; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(L * .05, 0); ctx.lineTo(L * .92, 0);   // quill
+  ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.stroke();
+}
+// side: 1 = right wing, -1 = left (mirrored). Each feather lags the main stroke, tips lag most.
+function drawWing(side, t, fast) {
+  const ph = heart.phase + (side < 0 ? .18 : 0);
+  const f = Math.sin(ph + .45 * Math.sin(ph));                     // faster downstroke
+  const adjust = Math.sin(t * .7) * Math.sin(t * 1.9) * .08;       // occasional tiny adjustment
+  ctx.save(); ctx.scale(side, 1); ctx.translate(S * .38, -S * .04);
+  ctx.rotate(-.12 + f * .5 * (side > 0 ? 1 : .92) + adjust);
+  for (let l = 0; l < 3; l++) {
+    const n = [7, 6, 5][l], len = S * [1.1, .85, .6][l], wid = S * [.2, .17, .14][l];
+    for (let i = 0; i < n; i++) {
+      const u = i / (n - 1);
+      const lag = Math.sin(ph - .5 - i * .17 - l * .3) * .2 * (.25 + u * .9) * (1 + fast * .5);
+      const flut = Math.sin(t * 9 + i * 1.7 + l) * .025 * (1 + fast * 2);
+      ctx.save(); ctx.rotate(-1.35 + u * 1.85 + l * .05 + lag + flut);
+      if (l === 0 && W > 700) { ctx.shadowColor = 'rgba(255,140,220,.8)'; ctx.shadowBlur = 14; }
+      feather(len * (.8 + .2 * Math.sin(u * Math.PI)), wid, l);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+function drawHeart(t) {
+  const fast = clamp((heart.flapF - 5) / 12, 0, 1);
+  const beat = 1 + .05 * Math.pow(Math.max(0, Math.sin(t * 5.4)), 3) + heart.alert * .03;
+  const px = heart.x + Math.cos(t * 1.1) * 5, py = heart.y + Math.sin(t * 1.7) * 7;
+  ctx.save(); ctx.translate(px, py);
+  // soft glow / shadow beneath
+  ctx.save(); ctx.translate(0, S * .78); ctx.scale(1, .22);
+  const sg = ctx.createRadialGradient(0, 0, 0, 0, 0, S * .75);
+  sg.addColorStop(0, 'rgba(255,70,140,.45)'); sg.addColorStop(1, 'rgba(255,70,140,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, S * .75, 0, 6.283); ctx.fill(); ctx.restore();
+  ctx.rotate(heart.rot); ctx.scale(beat, beat);
+  drawWing(-1, t, fast); drawWing(1, t, fast);
+  // body
+  const bg = ctx.createRadialGradient(-S * .15, -S * .2, S * .05, 0, 0, S * .72);
+  [[0, '#ff9ab8'], [.4, '#ff2e63'], [.75, '#b0103f'], [1, '#6b0a2e']].forEach(([o, c]) => bg.addColorStop(o, c));
+  ctx.shadowColor = 'rgba(255,40,110,.9)'; ctx.shadowBlur = 32;
+  heartPath(S); ctx.fillStyle = bg; ctx.fill(); ctx.shadowBlur = 0;
+  ctx.save(); heartPath(S); ctx.clip();
+  const ig = ctx.createRadialGradient(0, S * .05, S * .1, 0, S * .05, S * .55);
+  ig.addColorStop(0, 'rgba(255,255,255,0)'); ig.addColorStop(1, 'rgba(255,200,230,.45)');
+  ctx.fillStyle = ig; ctx.fillRect(-S, -S, S * 2, S * 2);
+  ctx.rotate(-.5); ctx.fillStyle = 'rgba(255,255,255,.34)';                   // gloss
+  ctx.beginPath(); ctx.ellipse(-S * .1, -S * .3, S * .17, S * .07, 0, 0, 6.283); ctx.fill();
+  ctx.restore();
+  heartPath(S); ctx.strokeStyle = 'rgba(255,190,220,.5)'; ctx.lineWidth = S * .03; ctx.stroke();
+  ctx.font = `700 ${S * .5}px Cinzel,Georgia,serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(110,0,45,.7)'; ctx.shadowBlur = 6; ctx.fillStyle = '#fff';
+  ctx.fillText('S', 0, S * .02);
+  ctx.restore();
+}
+
+/* ================= MOVEMENT / ESCAPE ================= */
+const escDist = () => Math.max(CONFIG.escapeDistance * S / CONFIG.heartSize, S * 1.0);
+function wander(now) {
+  const R = Math.min(W, H) * .35;
+  heart.tx = clamp(heart.x + rand(-R, R), bounds.l, bounds.r);
+  heart.ty = clamp(heart.y + rand(-R, R), bounds.t, bounds.b);
+  heart.nextWander = now + rand(2200, 4200);
+}
+function escape(now) {
+  if (state !== 'play') return;
+  lastEscape = now;
+  const ox = heart.x, oy = heart.y;
+  const ax = ox - pointer.x, ay = oy - pointer.y, al = Math.hypot(ax, ay) || 1;
+  const minTravel = Math.min(W, H) * .3;
+  let best = null, bs = -1e9;
+  for (let i = 0; i < 16; i++) {                       // pick the best of several candidates: far from the cursor, away from it
+    const cx = rand(bounds.l, bounds.r), cy = rand(bounds.t, bounds.b);
+    const tr = Math.hypot(cx - ox, cy - oy);
+    if (tr < minTravel) continue;
+    const dp = Math.hypot(cx - pointer.x, cy - pointer.y);
+    const dir = ((cx - ox) * ax + (cy - oy) * ay) / (tr * al);
+    const sc = dp + dir * 220 + rand(0, 160);
+    if (sc > bs) { bs = sc; best = { x: cx, y: cy }; }
+  }
+  if (!best) best = { x: rand(bounds.l, bounds.r), y: rand(bounds.t, bounds.b) };
+  heart.tx = best.x; heart.ty = best.y; heart.mode = 'flee';
+  heart.fleeUntil = now + 850; heart.nextWander = now + 1800;
+  burst(ox, oy, 28); shake = 7; lazyText(ox, oy); blip(700, 150, .28, 'sine', .08);
+  escapes++; $('count').textContent = 'Escapes: ' + escapes;
+  if (Math.random() < CONFIG.msgChance) showMsg(TEASES[Math.floor(Math.random() * TEASES.length)]);
+  if (CONFIG.enableEnding && !endingDone && escapes >= CONFIG.maxEscapes) { state = 'ending'; setTimeout(startEnding, 900); }
+}
+function update(dt, t, now) {
+  const d = Math.hypot(pointer.x - heart.x, pointer.y - heart.y), ed = escDist();
+  const near = pointer.active && state === 'play';
+  heart.alert = lerp(heart.alert, near && d < ed * CONFIG.alertFactor ? 1 : 0, 1 - Math.pow(.001, dt));
+  if (near && d < ed && now - lastEscape > CONFIG.escapeCooldown) escape(now);
+  if (heart.mode === 'flee' && now > heart.fleeUntil) heart.mode = 'idle';
+  if (state === 'play' && heart.mode === 'idle' && now > heart.nextWander) wander(now);
+  const flee = heart.mode === 'flee', k = flee ? 12 : 1.5, c = flee ? 6.5 : 2.3;
+  heart.vx += ((heart.tx - heart.x) * k - heart.vx * c) * dt;
+  heart.vy += ((heart.ty - heart.y) * k - heart.vy * c) * dt;
+  const sp = Math.hypot(heart.vx, heart.vy), mx = flee ? 1800 : 260;
+  if (sp > mx) { heart.vx *= mx / sp; heart.vy *= mx / sp; }
+  heart.x += heart.vx * dt; heart.y += heart.vy * dt;
+  if (heart.x < bounds.l || heart.x > bounds.r) { heart.x = clamp(heart.x, bounds.l, bounds.r); heart.vx *= -.2; }
+  if (heart.y < bounds.t || heart.y > bounds.b) { heart.y = clamp(heart.y, bounds.t, bounds.b); heart.vy *= -.2; }
+  const lean = heart.alert * (heart.x > pointer.x ? 1 : -1) * .14;
+  heart.rot = lerp(heart.rot, clamp(heart.vx * .0012, -.4, .4) + Math.sin(t * .9) * .05 + lean, 1 - Math.pow(.0005, dt));
+  const ft = state === 'ending' ? 2.6 : flee ? 17 : 5.2 + heart.alert * 6;
+  heart.flapF = lerp(heart.flapF, ft, 1 - Math.pow(.01, dt));
+  heart.phase += heart.flapF * dt;
+  // idle sparkles, escape trail, background hearts
+  if (Math.random() < .35) spawn(heart.x + rand(-S * .6, S * .6), heart.y + rand(-S * .5, S * .5), { vy: -rand(10, 30), life: 1.2, size: rand(1, 2.4), hue: rand(310, 340) });
+  if (flee) for (let i = 0; i < 2; i++) spawn(heart.x + rand(-8, 8), heart.y + rand(-8, 8), { vx: rand(-30, 30), vy: rand(-30, 30), life: .6, size: rand(2, 4), heart: Math.random() < .25, hue: rand(320, 350) });
+  if ((bgT -= dt) < 0) { bgT = rand(.8, 1.8); const v = rand(25, 55); spawn(rand(0, W), H + 10, { vy: -v, life: H / v, size: rand(5, 10), heart: true, drag: 1, a: .22, hue: 335 }); }
+}
+
+/* ================= UI: TEXT / MESSAGES ================= */
+let msgTimer;
+function showMsg(text, ms = 1500) {
+  const m = $('msg'); m.textContent = text; m.classList.add('on');
+  clearTimeout(msgTimer); msgTimer = setTimeout(() => m.classList.remove('on'), ms);
+}
+function lazyText(x, y) {
+  const el = document.createElement('div'); el.className = 'lazy';
+  el.style.left = clamp(x + rand(-45, 45), 70, W - 70) + 'px'; el.style.top = clamp(y + rand(-40, 10), 40, H - 40) + 'px';
+  el.innerHTML = '<span>lazy frrr 😂</span>';
+  el.firstChild.style.animationDuration = CONFIG.messageDuration + 'ms';
+  world.appendChild(el); setTimeout(() => el.remove(), CONFIG.messageDuration + 150);
+}
+const big = (text) => { const b = $('big'); b.textContent = text; b.classList.toggle('on', !!text); };
+
+/* ================= ENDING (set enableEnding:false to disable) ================= */
+function startEnding() {
+  heart.tx = (bounds.l + bounds.r) / 2; heart.ty = (bounds.t + bounds.b) / 2; heart.mode = 'idle';
+  world.classList.add('dim');
+  setTimeout(() => { big('Okay okay… you win 😭❤️'); blip(1200, 1800, .3, 'sine', .05); }, 1600);
+  setTimeout(() => big('But you still can\'t catch me.'), 4600);
+  setTimeout(() => {
+    big(''); endingDone = true; state = 'play'; world.classList.remove('dim');
+    escape(performance.now());                            // one final playful escape
+  }, 7400);
+  setTimeout(() => big('Maybe S was never meant to be caught… ❤️'), 8600);
+  setTimeout(() => big(''), 15500);
+}
+
+/* ================= CAT ================= */
+const CAT_SVG = `<svg viewBox="0 0 100 100"><path class="tail" d="M76 90C102 88 98 56 88 56" fill="none" stroke="#e99a52" stroke-width="7" stroke-linecap="round"/>
+<ellipse cx="50" cy="88" rx="26" ry="16" fill="#f6b26b"/><g class="head">
+<polygon points="24,44 27,13 47,32" fill="#f6b26b"/><polygon points="76,44 73,13 53,32" fill="#f6b26b"/>
+<polygon points="29,36 31,21 41,31" fill="#ff9db8"/><polygon points="71,36 69,21 59,31" fill="#ff9db8"/>
+<ellipse cx="50" cy="55" rx="29" ry="25" fill="#f6b26b"/>
+<ellipse class="eye" cx="38" cy="52" rx="5" ry="6" fill="#2b1a2e"/><ellipse class="eye" cx="62" cy="52" rx="5" ry="6" fill="#2b1a2e"/>
+<circle cx="36.5" cy="50" r="1.7" fill="#fff"/><circle cx="60.5" cy="50" r="1.7" fill="#fff"/>
+<path d="M47 61h6l-3 4z" fill="#ff7aa5"/><path d="M40 67q5 6 10-1q5 7 10 1" fill="none" stroke="#2b1a2e" stroke-width="2" stroke-linecap="round"/>
+<path d="M22 58h14M22 64l14-3M78 58H64M78 64l-14-3" stroke="#fff" stroke-width="1.2" opacity=".7"/>
+<ellipse cx="30" cy="62" rx="5" ry="3" fill="#ff8fb3" opacity=".5"/><ellipse cx="70" cy="62" rx="5" ry="3" fill="#ff8fb3" opacity=".5"/></g></svg>`;
+let cat = null, catKill;
+function removeCat() { clearTimeout(catKill); if (cat) { cat.remove(); cat = null; } }
+function spawnCat() {
+  removeCat();                                             // never stack cats
+  const cs = clamp(Math.min(W, H) * .2, 72, 112);
+  let x, y, dx, dy, flip, tries = 0;
+  do {
+    const e = Math.floor(Math.random() * 4); dx = dy = 0; flip = false;
+    if (e === 0) { x = 8; y = rand(H * .3, H - cs - 10); dx = -cs * 1.3; }
+    else if (e === 1) { x = W - cs - 8; y = rand(H * .3, H - cs - 10); dx = cs * 1.3; flip = true; }
+    else if (e === 2) { flip = Math.random() < .5; x = flip ? W - cs - 8 : 8; y = rand(8, 60); dy = -cs * 1.3; }
+    else { x = rand(8, W - cs - 8); y = H - cs - 8; dy = cs * 1.3; }
+  } while (Math.hypot(x + cs / 2 - heart.x, y + cs / 2 - heart.y) < S * 1.7 && ++tries < 8);
+  const el = cat = document.createElement('div');
+  el.className = 'cat' + (flip ? ' flip' : '');
+  el.style.cssText = `left:${x}px;top:${y}px;--cs:${cs}px;--dx:${dx}px;--dy:${dy}px`;
+  el.innerHTML = CAT_SVG + `<div class="bub${y < 70 ? ' below' : ''}">${CAT_LINES[Math.floor(Math.random() * CAT_LINES.length)]}</div>`;
+  const cx = x + cs / 2, bub = el.querySelector('.bub');
+  if (cx < 80) bub.style.translate = '-15% 0'; else if (cx > W - 80) bub.style.translate = '-85% 0';
+  world.appendChild(el); blip(520, 880, .18, 'triangle', .07);
+  catKill = setTimeout(() => { el.classList.add('out'); setTimeout(() => { if (cat === el) removeCat(); }, 380); }, CONFIG.catLife);
+}
+function scheduleCat() { setTimeout(() => { spawnCat(); scheduleCat(); }, rand(CONFIG.catMin, CONFIG.catMax)); }
+
+/* ================= AUDIO (only after user taps the button) ================= */
+let AC = null, soundOn = true;   // always on; browsers just need one tap/click first to allow audio
+function unlockAudio() {
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+  } catch (err) { return; }
+  if (AC.state === 'running') ['pointerdown', 'pointerup', 'touchend', 'keydown'].forEach(ev => window.removeEventListener(ev, unlockAudio));
+}
+['pointerdown', 'pointerup', 'touchend', 'keydown'].forEach(ev => window.addEventListener(ev, unlockAudio));
+function blip(f1, f2, dur, type, vol) {
+  if (!soundOn || !AC || AC.state !== 'running') return;
+  const o = AC.createOscillator(), g = AC.createGain(), n = AC.currentTime;
+  o.type = type; o.frequency.setValueAtTime(f1, n); o.frequency.exponentialRampToValueAtTime(f2, n + dur);
+  g.gain.setValueAtTime(vol, n); g.gain.exponentialRampToValueAtTime(.001, n + dur);
+  o.connect(g); g.connect(AC.destination); o.start(); o.stop(n + dur);
+}
+
+/* ================= INPUT ================= */
+function setPointer(e) { pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true; }
+window.addEventListener('pointermove', setPointer, { passive: true });
+window.addEventListener('pointerdown', e => {
+  setPointer(e);
+  const d = Math.hypot(pointer.x - heart.x, pointer.y - heart.y);
+  if (state === 'play' && d < Math.max(escDist() * 1.25, S * 1.1)) escape(performance.now());   // any tap near/on the heart = escape
+}, { passive: true });
+const release = e => { if (e.pointerType !== 'mouse') pointer.active = false; };
+window.addEventListener('pointerup', release); window.addEventListener('pointercancel', release);
+document.documentElement.addEventListener('mouseleave', () => { pointer.active = false; });
+window.addEventListener('resize', resize); window.addEventListener('orientationchange', resize);
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+/* ================= MAIN LOOP ================= */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  const t = now / 1000;
+  update(dt, t, now);
+  ctx.clearRect(0, 0, W, H);
+  drawStars(t); drawParts(dt); drawHeart(t);
+  if (shake > .05) { world.style.transform = `translate(${rand(-shake, shake)}px,${rand(-shake, shake)}px)`; shake *= Math.pow(.002, dt); }
+  else if (shake) { shake = 0; world.style.transform = ''; }
+  requestAnimationFrame(frame);
+}
+resize();
+heart.x = heart.tx = (bounds.l + bounds.r) / 2; heart.y = heart.ty = (bounds.t + bounds.b) / 2;
+heart.nextWander = performance.now() + 2500;
+scheduleCat();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
